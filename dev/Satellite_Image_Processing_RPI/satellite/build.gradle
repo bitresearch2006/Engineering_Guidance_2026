@@ -1,0 +1,109 @@
+plugins {
+    id 'base'
+}
+
+ext {
+    functionName = "satellite"
+    imageName = "localhost:5000/${functionName}:latest"
+    gatewayUrl = "http://127.0.0.1:8080"
+    templateName = "python3-http-debian"   // declare here
+    templateRepo = "https://github.com/bitresearch2006/faas_templates.git"
+    templateBranch = "main"                // optional, default branch
+}
+
+tasks.create("downloadTemplate") {
+    group = "faas"
+    description = "Download template folder from Git repository"
+
+    doLast {
+        def buildTemplateDir = file("build/template/${templateName}")
+        def tempDir = file("build/faas_templates_temp")
+
+        if (tempDir.exists()) tempDir.deleteDir()
+        tempDir.mkdirs()
+
+        // Initialize git repo
+        exec { workingDir tempDir; commandLine "git", "init" }
+        exec { workingDir tempDir; commandLine "git", "remote", "add", "-f", "origin", templateRepo }
+        exec { workingDir tempDir; commandLine "git", "config", "core.sparseCheckout", "true" }
+
+        // Sparse checkout file
+        def sparseFile = new File(tempDir, ".git/info/sparse-checkout")
+        sparseFile.text = "template/${templateName}/*\n"
+
+        // Pull the folder
+        exec { workingDir tempDir; commandLine "git", "pull", "origin", templateBranch }
+
+        // Copy to build/template/
+        copy {
+            from new File(tempDir, "template/${templateName}")
+            into file(buildTemplateDir)
+        }
+
+        println "Template '${templateName}' downloaded to ${buildTemplateDir.absolutePath}"
+        tempDir.deleteDir()
+    }
+}
+
+tasks.create("copySources") {
+    group = "faas"
+    description = "Copy main folder and ${functionName} into build directory"
+    dependsOn("downloadTemplate")
+    doLast {
+        // Copy handler folder
+        copy {
+            from "main"
+            into "build/main"
+        }
+
+        // Copy function yml
+        copy {
+            from "${functionName}.yml"
+            into "build"
+        }
+
+        println "Copied main/ and ${functionName} into build/"
+    }
+}
+
+tasks.create("faasBuild") {
+    group = "faas"
+    description = "Build the faas function image"
+    dependsOn("copySources")
+    doLast {
+        exec {
+            workingDir "build"                  // run inside build/
+            commandLine "faas-cli", "build", "-f", "${functionName}.yml"
+        }
+    }
+}
+
+tasks.create("faasPush") {
+    group = "faas"
+    description = "Push the faas function image"
+    dependsOn("faasBuild")
+    doLast {
+        exec {
+            workingDir "build"                  // run inside build/
+            commandLine "faas-cli", "push", "-f", "${functionName}.yml"
+        }
+    }
+}
+
+tasks.create("faasDeploy") {
+    group = "faas"
+    description = "Deploy the faas function"
+    dependsOn("faasPush")
+    doLast {
+        exec {
+            workingDir "build"                  // run inside build/
+            commandLine "faas-cli", "deploy", "-f", "${functionName}.yml"
+        }
+    }
+}
+
+tasks.create("faasAll") {
+    group = "faas"
+    description = "Build, push and deploy in one go"
+    dependsOn("faasDeploy")
+}
