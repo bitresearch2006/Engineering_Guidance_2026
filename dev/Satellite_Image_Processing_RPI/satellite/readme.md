@@ -146,7 +146,7 @@ docker pull localhost:5000/satellite:latest
 
 ---
 
-## 6) Scaling settings (Not worked)
+## 6) Scaling settings (Not worked use cold start after reboot under heading 10)
 
 Add these labels to keep a warm replica and bound autoscaling:
 
