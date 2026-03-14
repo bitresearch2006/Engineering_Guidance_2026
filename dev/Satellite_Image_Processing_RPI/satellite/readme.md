@@ -257,11 +257,12 @@ curl -i -X POST -H "Content-Type: application/json" \
   http://127.0.0.1:8080/function/satellite
 ```
 
-**Keep one warm replica (add to YAML):**
-```yaml
-labels:
-  com.openfaas.scale.min: "1"
-  com.openfaas.scale.max: "4"
+**cold start after reboot:**
+```bash
+enable crone:
+./gradlew installWarmupCron
+disable crone:
+./gradlew removeWarmupCron
 ```
 
 ---
