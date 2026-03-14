@@ -90,6 +90,22 @@ tasks.create("faasPush") {
     }
 }
 
+tasks.create("faasPushToContainerd") {
+    group = "faas"
+    description = "Import built image into faasd (containerd) via Docker->ctr pipe"
+    // We only need the image to be built locally, not pushed
+    //dependsOn("faasBuild")
+    doLast {
+            exec {
+                commandLine "bash", "-lc",
+                    "docker save ${imageName} | /usr/local/bin/ctr -n openfaas images import -"
+
+            }
+        println "Imported ${imageName} into containerd (namespace: openfaas)."
+    }
+}
+
+
 tasks.create("faasDeploy") {
     group = "faas"
     description = "Deploy the faas function"
@@ -102,8 +118,3 @@ tasks.create("faasDeploy") {
     }
 }
 
-tasks.create("faasAll") {
-    group = "faas"
-    description = "Build, push and deploy in one go"
-    dependsOn("faasDeploy")
-}
