@@ -1,0 +1,23 @@
+task getDeps {
+    doLast {
+        def repoDir = file("LandCoverClassification/RPI/sentinel2-landcover-classification")
+
+        if (!repoDir.exists()) {
+            println "Cloning repository..."
+
+            exec {
+                commandLine 'git', 'clone',
+                        'https://github.com/bitresearch2006/sentinel2-landcover-classification.git',
+                        repoDir.absolutePath
+            }
+
+        } else {
+            println "Repository already exists. Pulling latest changes..."
+
+            exec {
+                workingDir repoDir
+                commandLine 'git', 'pull'
+            }
+        }
+    }
+}
