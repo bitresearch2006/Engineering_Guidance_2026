@@ -2,7 +2,11 @@ import os
 os.environ["TORCHDYNAMO_DISABLE"] = "1"
 
 import sys
-sys.path.append(os.path.abspath("src"))  # should update with where sentinal repo
+
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+REPO_PATH = os.path.join(BASE_DIR, "sentinel2-landcover-classification")
+
+sys.path.append(REPO_PATH)
 
 import torch
 import numpy as np
