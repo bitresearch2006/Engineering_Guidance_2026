@@ -5,7 +5,7 @@ import base64
 from io import BytesIO
 from PIL import Image
 
-HOST = "bit_test.bitone.in"
+HOST = "bitresearch.bitone.in"
 PORT = 443
 
 
