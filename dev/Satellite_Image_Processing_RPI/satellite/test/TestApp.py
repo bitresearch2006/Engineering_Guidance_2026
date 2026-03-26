@@ -31,14 +31,15 @@ def main():
     print("Image name:", data["image_name"])
 
     # Decode Base64 image
-    img_bytes = base64.b64decode(data["image"])
+    img_bytes = base64.b64decode(data["content"])
 
-    img = Image.open(BytesIO(img_bytes))
+    # Save TIFF file
+    output_path = "output_test.tif"
 
-    print("Image loaded successfully")
+    with open(output_path, "wb") as f:
+     f.write(img_bytes)
 
-    img.show()
-
+    print("TIFF file saved successfully:", output_path)
 
 if __name__ == "__main__":
     main()

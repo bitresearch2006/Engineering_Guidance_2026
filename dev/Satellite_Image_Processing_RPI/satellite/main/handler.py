@@ -35,19 +35,15 @@ def handle(arg=None):
         random_image = random.choice(image_files)
         image_path = os.path.join(image_folder, random_image)
 
-        img = Image.open(image_path)
-
-        # Convert image to Base64
-        buffer = BytesIO()
-        img.save(buffer, format="JPEG")
-        img_bytes = buffer.getvalue()
+        with open(image_path, "rb") as f:
+         img_bytes = f.read()
 
         img_base64 = base64.b64encode(img_bytes).decode("utf-8")
 
         return json.dumps({
             "status": "success",
             "image_name": random_image,
-            "image": img_base64
+            "content": img_base64
         })
 
     except Exception as e:

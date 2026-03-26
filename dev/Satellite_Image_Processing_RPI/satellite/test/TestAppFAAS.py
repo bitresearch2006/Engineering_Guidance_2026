@@ -5,7 +5,10 @@ import base64
 from io import BytesIO
 from PIL import Image
 
-HOST = "bit_test.bitone.in"
+import rasterio
+import numpy as np
+
+HOST = "bitresearch.bitone.in"
 PORT = 443
 
 
@@ -62,14 +65,34 @@ def main():
     print("Image name:", data["image_name"])
 
     # Decode Base64 image
-    img_bytes = base64.b64decode(data["image"])
+    img_bytes = base64.b64decode(data["content"])
 
-    img = Image.open(BytesIO(img_bytes))
+    # Save TIFF file
+    output_path = "output_faas.tif"
 
-    print("Displaying image...")
+    with open(output_path, "wb") as f:
+     f.write(img_bytes)
 
-    img.show()
+    print("TIFF file saved:", output_path)
 
+    # Read using rasterio
+    with rasterio.open(output_path) as src:
+     img = src.read()   # (C, H, W)
+
+    # Take first 3 bands (approx RGB)
+    rgb = img[:3]
+
+    # Convert (C,H,W) → (H,W,C)
+    rgb = np.transpose(rgb, (1, 2, 0))
+
+    # Normalize for display
+    rgb = (rgb - rgb.min()) / (rgb.max() + 1e-6)
+    rgb = (rgb * 255).astype(np.uint8)
+
+    # Show using PIL
+    Image.fromarray(rgb).show()
+
+    print("RGB preview displayed!")
 
 if __name__ == "__main__":
     main()
