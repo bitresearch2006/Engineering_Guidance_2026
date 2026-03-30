@@ -196,6 +196,6 @@ python3 train.py
 
 Prediction:
 
-python3 handler.py
+python3 predict.py
 
 
