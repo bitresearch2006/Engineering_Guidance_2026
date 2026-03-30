@@ -13,13 +13,15 @@ import torch.nn as nn
 # -----------------------------
 # CONFIG
 # -----------------------------
-MODEL_PATH = "/home/bitdev/sips/sentinel2-landcover-classification/model_vie.pth"
+MODEL_PATH = "/home/pi/model_vie.pth"   # ⚠️ update path on Pi
 OUTPUT_BASE_DIR = "outputs"
 DEVICE = "cpu"
 
-# FAAS CONFIG
 HOST = "bitresearch.bitone.in"
 PORT = 443
+
+# Reduce CPU threads (important for Pi)
+torch.set_num_threads(1)
 
 # Create output folder
 IMAGE_FOLDER = os.path.join(OUTPUT_BASE_DIR, "Image_0")
@@ -29,8 +31,9 @@ TIF_PATH = os.path.join(IMAGE_FOLDER, "input.tif")
 RGB_PATH = os.path.join(IMAGE_FOLDER, "rgb_preview.png")
 PRED_PATH = os.path.join(IMAGE_FOLDER, "prediction.png")
 
+
 # -----------------------------
-# MODEL (UNCHANGED)
+# MODEL
 # -----------------------------
 class SimpleUNet(nn.Module):
     def __init__(self, num_classes=4):
@@ -70,20 +73,23 @@ class SimpleUNet(nn.Module):
 
 
 # -----------------------------
-# LOAD MODEL
+# LOAD MODEL (safe for Pi)
 # -----------------------------
+print("🔄 Loading model...")
 model = SimpleUNet(num_classes=4)
-model.load_state_dict(torch.load(MODEL_PATH, map_location=DEVICE))
+
+state_dict = torch.load(MODEL_PATH, map_location="cpu")
+model.load_state_dict(state_dict)
+
 model.to(DEVICE)
 model.eval()
-
 print("✅ Model loaded")
 
 
 # -----------------------------
-# STEP 1: FETCH IMAGE FROM FAAS
+# FETCH IMAGE FROM FAAS (robust)
 # -----------------------------
-def fetch_image_from_faas():
+def fetch_image_from_faas(retries=3):
     print("🌐 Fetching image from FAAS...")
 
     body = json.dumps({"arg": "hello"})
@@ -98,77 +104,88 @@ def fetch_image_from_faas():
         f"{body}"
     )
 
-    sock = socket.create_connection((HOST, PORT))
-    context = ssl._create_unverified_context()
-    ssock = context.wrap_socket(sock)
+    for attempt in range(retries):
+        try:
+            sock = socket.create_connection((HOST, PORT), timeout=10)
 
-    ssock.sendall(request.encode())
+            context = ssl._create_unverified_context()
+            ssock = context.wrap_socket(sock)
 
-    response = b""
-    while True:
-        data = ssock.recv(4096)
-        if not data:
-            break
-        response += data
+            ssock.sendall(request.encode())
 
-    ssock.close()
+            response = b""
+            while True:
+                data = ssock.recv(4096)
+                if not data:
+                    break
+                response += data
 
-    response_text = response.decode(errors="ignore")
-    body = response_text.split("\r\n\r\n", 1)[1]
+            ssock.close()
 
-    data = json.loads(body)
+            response_text = response.decode(errors="ignore")
+            body = response_text.split("\r\n\r\n", 1)[1]
 
-    if data["status"] != "success":
-        raise Exception(f"FAAS error: {data}")
+            data = json.loads(body)
 
-    img_bytes = base64.b64decode(data["content"])
+            if data["status"] != "success":
+                raise Exception(data)
 
-    with open(TIF_PATH, "wb") as f:
-        f.write(img_bytes)
+            img_bytes = base64.b64decode(data["content"])
 
-    print(f"✅ TIFF saved at: {TIF_PATH}")
+            with open(TIF_PATH, "wb") as f:
+                f.write(img_bytes)
+
+            print("✅ TIFF saved")
+            return
+
+        except Exception as e:
+            print(f"⚠️ Attempt {attempt+1} failed:", e)
+
+    raise RuntimeError("❌ Failed to fetch image from FAAS")
 
 
 fetch_image_from_faas()
 
 
 # -----------------------------
-# STEP 2: LOAD IMAGE
+# LOAD IMAGE (memory safe)
 # -----------------------------
 with rasterio.open(TIF_PATH) as src:
-    img = src.read()   # (C, H, W)
+    img = src.read(out_dtype=np.float32)  # avoids extra casting
 
 # -----------------------------
-# STEP 3: RGB PREVIEW
+# RGB PREVIEW
 # -----------------------------
 rgb = img[:3]
 rgb = np.transpose(rgb, (1, 2, 0))
 
-rgb_norm = (rgb - rgb.min()) / (rgb.max() + 1e-6)
-rgb_uint8 = (rgb_norm * 255).astype(np.uint8)
+rgb = (rgb - rgb.min()) / (rgb.max() + 1e-6)
+rgb_uint8 = (rgb * 255).astype(np.uint8)
 
 Image.fromarray(rgb_uint8).save(RGB_PATH)
-print(f"✅ RGB preview saved at: {RGB_PATH}")
+print("✅ RGB preview saved")
+
 
 # -----------------------------
-# STEP 4: PREPARE FOR MODEL
+# PREPARE INPUT
 # -----------------------------
-img_model = img[:3].astype(np.float32)
+img_model = img[:3]
 img_model = img_model / (img_model.max() + 1e-6)
 
-img_tensor = torch.from_numpy(img_model).unsqueeze(0).to(DEVICE)
+img_tensor = torch.from_numpy(img_model).unsqueeze(0)
 
 # -----------------------------
-# STEP 5: PREDICTION
+# PREDICTION (optimized)
 # -----------------------------
 with torch.no_grad():
     output = model(img_tensor)
-    pred = torch.argmax(output, dim=1).squeeze().cpu().numpy()
+    pred = torch.argmax(output, dim=1).squeeze().numpy()
 
 print("✅ Prediction done")
 
+
 # -----------------------------
-# STEP 6: COLOR MAPPING
+# COLOR MAP
 # -----------------------------
 color_map = {
     0: [255, 0, 0],
@@ -183,10 +200,7 @@ color_img = np.zeros((h, w, 3), dtype=np.uint8)
 for cls, color in color_map.items():
     color_img[pred == cls] = color
 
-# -----------------------------
-# STEP 7: SAVE OUTPUT
-# -----------------------------
 Image.fromarray(color_img).save(PRED_PATH)
 
-print(f"✅ Segmentation saved at: {PRED_PATH}")
-print("🎉 Done! Everything saved inside:", IMAGE_FOLDER)
+print("✅ Segmentation saved")
+print("🎉 Done! Output folder:", IMAGE_FOLDER)

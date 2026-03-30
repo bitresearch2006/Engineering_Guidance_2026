@@ -174,3 +174,28 @@ ping <windows_ip>
 - Run handler.py
 - Automatic processing every 10 seconds
 - Outputs saved and transferred to Windows
+
+## Additional requirements (Training a simple model)
+
+Setup:
+
+git clone git@github.com:MaxWolf-01/sentinel2-landcover-classification.git
+cd sentinel2-landcover-classification
+conda create -n s2lc python="3.10"
+conda activate s2lc
+pip install -r requirements.txt
+
+Download dataset:
+
+python src/data/download_sentinel.py vie --workers 2 --frequency QS  #  downloads a Sentinel-2 image for Vienna
+python src/data/download_labels.py vie osm-multiclass --workers 4
+
+Train model:
+
+python3 train.py
+
+Prediction:
+
+python3 predict.py
+
+
