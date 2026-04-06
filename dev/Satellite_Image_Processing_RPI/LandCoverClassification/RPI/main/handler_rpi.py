@@ -5,6 +5,7 @@ import json
 import base64
 import paramiko
 import time
+import shutil
 
 import torch
 import numpy as np
@@ -216,6 +217,10 @@ while True:
 
         print("✅ Sent to PC")
         print("✅ Done:", IMAGE_FOLDER)
+
+        # 🧹 Cleanup: delete local output folder to save space
+        shutil.rmtree(IMAGE_FOLDER)
+        print("🗑️ Deleted local folder:", IMAGE_FOLDER)
 
         counter += 1
 
