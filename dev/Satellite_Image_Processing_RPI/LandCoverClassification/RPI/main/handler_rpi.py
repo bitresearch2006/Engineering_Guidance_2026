@@ -15,7 +15,7 @@ import torch.nn as nn
 # -----------------------------
 # CONFIG
 # -----------------------------
-MODEL_PATH = "/home/pi/Engineering_Guidance_2026/dev/Satellite_Image_Processing_RPI/LandCoverClassification/model/model_vie.pth"
+MODEL_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "model", "model_vie.pth")
 OUTPUT_BASE_DIR = "outputs"
 DEVICE = "cpu"
 
