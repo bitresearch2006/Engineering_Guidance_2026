@@ -32,6 +32,18 @@ WINDOWS_DEST = "C:/Users/your_username/Desktop/outputs/"
 torch.set_num_threads(1)
 
 # -----------------------------
+# TEST CONFIG (LABEL CHECK)
+# -----------------------------
+TEST_LABEL_SEND = True  # Set False to disable label sending
+
+LABEL_DIR = os.path.join(
+    os.path.dirname(__file__),
+    "..", "..", "..",
+    "satellite", "main", "labels"
+)
+
+
+# -----------------------------
 # MODEL
 # -----------------------------
 class SimpleUNet(nn.Module):
@@ -210,6 +222,38 @@ while True:
             color_img[pred == cls] = color
 
         Image.fromarray(color_img).save(PRED_PATH)
+
+        # -----------------------------
+        # TEST: LOAD & SEND LABEL
+        # -----------------------------
+        if TEST_LABEL_SEND:
+        try:
+        label_idx = counter
+        label_tif_path = os.path.join(LABEL_DIR, f"{label_idx}.tif")
+        label_png_path = os.path.join(IMAGE_FOLDER, "label.png")
+
+        if os.path.exists(label_tif_path):
+            with rasterio.open(label_tif_path) as src:
+                label_img = src.read(1)
+
+            # 🔥 Convert label to RGB using color_map
+            h, w = label_img.shape
+            label_rgb = np.zeros((h, w, 3), dtype=np.uint8)
+
+            for cls, color in color_map.items():
+                label_rgb[label_img == cls] = color
+
+            Image.fromarray(label_rgb).save(label_png_path)
+
+            send_via_scp(label_png_path, WINDOWS_DEST + f"label_{counter}.png")
+
+            print("✅ Label sent (RGB)")
+
+        else:
+            print(f"⚠️ Label not found: {label_tif_path}")
+
+    except Exception as e:
+        print("⚠️ Label processing error:", e)
 
         # SCP SEND (ALL FILES)
         send_via_scp(RGB_PATH, WINDOWS_DEST + f"rgb_{counter}.png")
